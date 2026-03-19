@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Kitchen Dashboard</string>
+    <string name="settings_title">Settings</string>
+    <string name="menu_settings">Settings</string>
+    <string name="menu_reload">Reload</string>
+    <string name="menu_connect">Connect Printer</string>
+
+    <string-array name="paper_width_entries">
+        <item>58mm</item>
+        <item>80mm</item>
+    </string-array>
+
+    <string-array name="paper_width_values">
+        <item>58</item>
+        <item>80</item>
+    </string-array>
+
+    <string-array name="empty_array">
+        <item>None</item>
+    </string-array>
+</resources>

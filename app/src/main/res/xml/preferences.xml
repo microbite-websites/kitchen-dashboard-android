@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <PreferenceCategory android:title="Dashboard">
+
+        <EditTextPreference
+            android:key="dashboard_url"
+            android:title="Dashboard URL"
+            android:summary="Full URL to your kitchen dashboard"
+            android:hint="https://yoursite.com/kitchen-dashboard/?kd_token=..."
+            android:inputType="textUri"
+            android:singleLine="true"
+            android:dialogTitle="Dashboard URL" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="Printer">
+
+        <ListPreference
+            android:key="printer_name"
+            android:title="Bluetooth Printer"
+            android:summary="Select your paired Bluetooth printer"
+            android:dialogTitle="Select Printer"
+            android:entries="@array/empty_array"
+            android:entryValues="@array/empty_array" />
+
+        <ListPreference
+            android:key="paper_width"
+            android:title="Paper Width"
+            android:summary="Select receipt paper width"
+            android:dialogTitle="Paper Width"
+            android:entries="@array/paper_width_entries"
+            android:entryValues="@array/paper_width_values"
+            android:defaultValue="58" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>
