@@ -2,19 +2,24 @@ package com.microbite.kitchendashboard;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -39,13 +44,25 @@ public class MainActivity extends AppCompatActivity {
     private static final UUID SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
     private static final int PERMISSION_REQUEST_CODE = 100;
 
+    // Auto-reconnect: wait 5s between attempts, give up after 10 tries
+    private static final int RECONNECT_DELAY_MS  = 5000;
+    private static final int RECONNECT_MAX_TRIES = 10;
+
     private WebView webView;
     private BluetoothAdapter bluetoothAdapter;
     private BluetoothSocket bluetoothSocket;
     private OutputStream outputStream;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private boolean isConnecting = false;
+
+    private boolean isConnecting     = false;
+    private boolean autoReconnecting = false;
+    private int     reconnectAttempt = 0;
+
+    // Wake lock — keeps CPU alive so SSE / BT stay connected when screen dims
+    private PowerManager.WakeLock wakeLock;
+
+    // ─── Lifecycle ────────────────────────────────────────────────────────────
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -56,10 +73,101 @@ public class MainActivity extends AppCompatActivity {
         webView = findViewById(R.id.webView);
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 
+        applyScreenOnSetting();
         setupWebView();
         requestPermissions();
+        promptBatteryOptimisation();
         loadDashboard();
     }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        applyScreenOnSetting();
+        acquireWakeLock();
+
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        String url     = prefs.getString("dashboard_url", "");
+        String current = webView.getUrl();
+        if (!url.isEmpty() && (current == null || !current.equals(url))) {
+            webView.loadUrl(url);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        releaseWakeLock();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        executor.shutdown();
+        cancelAutoReconnect();
+        closeBluetoothSocket();
+        releaseWakeLock();
+    }
+
+    // ─── Wake Lock ────────────────────────────────────────────────────────────
+
+    private void acquireWakeLock() {
+        if (wakeLock != null && wakeLock.isHeld()) return;
+        PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+        if (pm == null) return;
+        wakeLock = pm.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "KitchenDashboard::PrinterWakeLock"
+        );
+        // Re-acquired on each onResume; 1-hour cap is a safety net
+        wakeLock.acquire(60 * 60 * 1000L);
+        Log.d(TAG, "Wake lock acquired");
+    }
+
+    private void releaseWakeLock() {
+        if (wakeLock != null && wakeLock.isHeld()) {
+            wakeLock.release();
+            Log.d(TAG, "Wake lock released");
+        }
+    }
+
+    private void applyScreenOnSetting() {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        boolean keepOn = prefs.getBoolean("keep_screen_on", true);
+        if (keepOn) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        } else {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
+    }
+
+    // ─── Battery Optimisation ─────────────────────────────────────────────────
+
+    private void promptBatteryOptimisation() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
+        PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+        if (pm == null) return;
+        if (pm.isIgnoringBatteryOptimizations(getPackageName())) return;
+
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        if (prefs.getBoolean("battery_opt_asked", false)) return;
+        prefs.edit().putBoolean("battery_opt_asked", true).apply();
+
+        new AlertDialog.Builder(this)
+                .setTitle(getString(R.string.battery_opt_title))
+                .setMessage(getString(R.string.battery_opt_message))
+                .setPositiveButton(getString(R.string.battery_opt_ok), (dialog, which) -> {
+                    Intent intent = new Intent(
+                            Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                            Uri.parse("package:" + getPackageName())
+                    );
+                    startActivity(intent);
+                })
+                .setNegativeButton(getString(R.string.battery_opt_cancel), null)
+                .show();
+    }
+
+    // ─── WebView Setup ────────────────────────────────────────────────────────
 
     @SuppressLint("SetJavaScriptEnabled")
     private void setupWebView() {
@@ -72,17 +180,13 @@ public class MainActivity extends AppCompatActivity {
         settings.setDisplayZoomControls(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
 
-        // Inject the JavaScript bridge
         webView.addJavascriptInterface(new PrintBridge(), "KDPrint");
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                // Inject bridge detection for the plugin
-                webView.evaluateJavascript(
-                    "window.kdAndroidBridge = true;", null
-                );
+                webView.evaluateJavascript("window.kdAndroidBridge = true;", null);
             }
         });
     }
@@ -91,7 +195,6 @@ public class MainActivity extends AppCompatActivity {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         String url = prefs.getString("dashboard_url", "");
         if (url.isEmpty()) {
-            // No URL set — open settings
             startActivity(new Intent(this, SettingsActivity.class));
             Toast.makeText(this, "Please configure your dashboard URL", Toast.LENGTH_LONG).show();
         } else {
@@ -99,25 +202,29 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // ─── Permissions ──────────────────────────────────────────────────────────
+
     private void requestPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT)
                     != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(this,
-                    new String[]{
-                        Manifest.permission.BLUETOOTH_CONNECT,
-                        Manifest.permission.BLUETOOTH_SCAN
-                    }, PERMISSION_REQUEST_CODE);
+                        new String[]{
+                                Manifest.permission.BLUETOOTH_CONNECT,
+                                Manifest.permission.BLUETOOTH_SCAN
+                        }, PERMISSION_REQUEST_CODE);
             }
         } else {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                     != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                    PERMISSION_REQUEST_CODE);
+                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                        PERMISSION_REQUEST_CODE);
             }
         }
     }
+
+    // ─── Options Menu ─────────────────────────────────────────────────────────
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -136,15 +243,19 @@ public class MainActivity extends AppCompatActivity {
             return true;
         }
         if (item.getItemId() == R.id.action_connect_printer) {
+            reconnectAttempt = 0;
             connectPrinter();
             return true;
         }
         return super.onOptionsItemSelected(item);
     }
 
+    // ─── Bluetooth Connection ─────────────────────────────────────────────────
+
     @SuppressLint("MissingPermission")
     private void connectPrinter() {
         if (isConnecting) return;
+
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         String printerName = prefs.getString("printer_name", "");
         if (printerName.isEmpty()) {
@@ -154,11 +265,12 @@ public class MainActivity extends AppCompatActivity {
         }
 
         isConnecting = true;
-        Toast.makeText(this, "Connecting to " + printerName + "...", Toast.LENGTH_SHORT).show();
+        if (!autoReconnecting) {
+            Toast.makeText(this, "Connecting to " + printerName + "…", Toast.LENGTH_SHORT).show();
+        }
 
         executor.execute(() -> {
             try {
-                // Find the paired device by name
                 Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
                 BluetoothDevice targetDevice = null;
                 for (BluetoothDevice device : pairedDevices) {
@@ -170,16 +282,15 @@ public class MainActivity extends AppCompatActivity {
 
                 if (targetDevice == null) {
                     mainHandler.post(() -> {
-                        Toast.makeText(this, "Printer not found. Pair it in Bluetooth settings first.", Toast.LENGTH_LONG).show();
+                        Toast.makeText(this,
+                                "Printer not found. Pair it in Bluetooth settings first.",
+                                Toast.LENGTH_LONG).show();
                         isConnecting = false;
                     });
                     return;
                 }
 
-                // Close existing connection
-                if (bluetoothSocket != null) {
-                    try { bluetoothSocket.close(); } catch (IOException e) { /* ignore */ }
-                }
+                closeBluetoothSocket();
 
                 bluetoothSocket = targetDevice.createRfcommSocketToServiceRecord(SPP_UUID);
                 bluetoothAdapter.cancelDiscovery();
@@ -187,40 +298,61 @@ public class MainActivity extends AppCompatActivity {
                 outputStream = bluetoothSocket.getOutputStream();
 
                 mainHandler.post(() -> {
+                    isConnecting     = false;
+                    autoReconnecting = false;
+                    reconnectAttempt = 0;
                     Toast.makeText(this, "✅ Printer connected!", Toast.LENGTH_SHORT).show();
-                    isConnecting = false;
-                    // Notify the WebView that printer is ready
                     webView.evaluateJavascript("window.kdPrinterConnected = true;", null);
+                    Log.d(TAG, "Printer connected successfully");
                 });
 
             } catch (IOException e) {
-                Log.e(TAG, "Bluetooth connection failed", e);
+                Log.e(TAG, "Bluetooth connection failed (attempt " + reconnectAttempt + ")", e);
                 mainHandler.post(() -> {
-                    Toast.makeText(this, "❌ Connection failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
                     isConnecting = false;
+                    scheduleAutoReconnect();
                 });
             }
         });
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        // Reload if URL changed in settings
+    private void scheduleAutoReconnect() {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        String url = prefs.getString("dashboard_url", "");
-        if (!url.isEmpty() && !webView.getUrl().equals(url)) {
-            webView.loadUrl(url);
+        boolean enabled = prefs.getBoolean("auto_reconnect", true);
+        if (!enabled) {
+            Toast.makeText(this, "❌ Printer disconnected", Toast.LENGTH_SHORT).show();
+            return;
         }
+
+        reconnectAttempt++;
+        if (reconnectAttempt > RECONNECT_MAX_TRIES) {
+            autoReconnecting = false;
+            reconnectAttempt = 0;
+            Toast.makeText(this,
+                    "❌ Could not reconnect after " + RECONNECT_MAX_TRIES + " attempts. " +
+                    "Use menu → Connect Printer to try again.",
+                    Toast.LENGTH_LONG).show();
+            webView.evaluateJavascript("window.kdPrinterConnected = false;", null);
+            return;
+        }
+
+        autoReconnecting = true;
+        Log.d(TAG, "Auto-reconnect scheduled in " + RECONNECT_DELAY_MS + "ms (attempt " + reconnectAttempt + ")");
+        mainHandler.postDelayed(this::connectPrinter, RECONNECT_DELAY_MS);
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        executor.shutdown();
+    private void cancelAutoReconnect() {
+        autoReconnecting = false;
+        reconnectAttempt = 0;
+        mainHandler.removeCallbacksAndMessages(null);
+    }
+
+    private void closeBluetoothSocket() {
         if (bluetoothSocket != null) {
             try { bluetoothSocket.close(); } catch (IOException e) { /* ignore */ }
+            bluetoothSocket = null;
         }
+        outputStream = null;
     }
 
     // ─── JavaScript Bridge ────────────────────────────────────────────────────
@@ -229,14 +361,13 @@ public class MainActivity extends AppCompatActivity {
 
         @JavascriptInterface
         public void print(String hexData) {
-            // hexData is a hex string of ESC/POS bytes e.g. "1b40 1b61..."
             executor.execute(() -> {
                 try {
                     if (outputStream == null) {
                         mainHandler.post(() ->
-                            Toast.makeText(MainActivity.this,
-                                "Printer not connected. Use menu → Connect Printer",
-                                Toast.LENGTH_LONG).show()
+                                Toast.makeText(MainActivity.this,
+                                        "Printer not connected. Use menu → Connect Printer",
+                                        Toast.LENGTH_LONG).show()
                         );
                         return;
                     }
@@ -245,12 +376,12 @@ public class MainActivity extends AppCompatActivity {
                     outputStream.flush();
                     Log.d(TAG, "Printed " + bytes.length + " bytes");
                 } catch (IOException e) {
-                    Log.e(TAG, "Print failed", e);
-                    outputStream = null; // mark as disconnected
+                    Log.e(TAG, "Print failed — triggering auto-reconnect", e);
+                    outputStream = null;
                     mainHandler.post(() -> {
                         Toast.makeText(MainActivity.this,
-                            "Print failed — reconnecting...", Toast.LENGTH_SHORT).show();
-                        connectPrinter();
+                                "Print failed — reconnecting…", Toast.LENGTH_SHORT).show();
+                        scheduleAutoReconnect();
                     });
                 }
             });
@@ -258,12 +389,13 @@ public class MainActivity extends AppCompatActivity {
 
         @JavascriptInterface
         public boolean isConnected() {
-            return outputStream != null && bluetoothSocket != null && bluetoothSocket.isConnected();
+            return outputStream != null
+                    && bluetoothSocket != null
+                    && bluetoothSocket.isConnected();
         }
 
         @JavascriptInterface
         public String getPairedPrinters() {
-            // Returns comma-separated list of paired Bluetooth device names
             if (bluetoothAdapter == null) return "";
             try {
                 @SuppressLint("MissingPermission")
@@ -283,7 +415,6 @@ public class MainActivity extends AppCompatActivity {
     // ─── Utilities ────────────────────────────────────────────────────────────
 
     private static byte[] hexToBytes(String hex) {
-        // Accepts "1B 40 1B 61" or "1B401B61" formats
         hex = hex.replaceAll("\\s+", "");
         int len = hex.length();
         byte[] data = new byte[len / 2];

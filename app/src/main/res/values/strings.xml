@@ -5,6 +5,14 @@
     <string name="menu_settings">Settings</string>
     <string name="menu_reload">Reload</string>
     <string name="menu_connect">Connect Printer</string>
+    <string name="pref_keep_screen_on_title">Keep Screen On</string>
+    <string name="pref_keep_screen_on_summary">Prevent screen from dimming while app is open (recommended when plugged in)</string>
+    <string name="pref_auto_reconnect_title">Auto-Reconnect Printer</string>
+    <string name="pref_auto_reconnect_summary">Automatically reconnect if the Bluetooth connection drops</string>
+    <string name="battery_opt_title">Battery Optimisation</string>
+    <string name="battery_opt_message">For reliable printing, allow Kitchen Dashboard to run unrestricted in the background. Tap OK to open battery settings.</string>
+    <string name="battery_opt_ok">Open Settings</string>
+    <string name="battery_opt_cancel">Not Now</string>
 
     <string-array name="paper_width_entries">
         <item>58mm</item>

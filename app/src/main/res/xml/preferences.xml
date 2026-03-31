@@ -14,6 +14,16 @@
 
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="Display &amp; Background">
+
+        <SwitchPreferenceCompat
+            android:key="keep_screen_on"
+            android:title="@string/pref_keep_screen_on_title"
+            android:summary="@string/pref_keep_screen_on_summary"
+            android:defaultValue="true" />
+
+    </PreferenceCategory>
+
     <PreferenceCategory android:title="Printer">
 
         <ListPreference
@@ -32,6 +42,12 @@
             android:entries="@array/paper_width_entries"
             android:entryValues="@array/paper_width_values"
             android:defaultValue="58" />
+
+        <SwitchPreferenceCompat
+            android:key="auto_reconnect"
+            android:title="@string/pref_auto_reconnect_title"
+            android:summary="@string/pref_auto_reconnect_summary"
+            android:defaultValue="true" />
 
     </PreferenceCategory>
 
