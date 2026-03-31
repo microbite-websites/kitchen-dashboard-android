@@ -18,6 +18,7 @@ import android.os.Looper;
 import android.os.PowerManager;
 import android.provider.Settings;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.Window;
@@ -69,7 +70,6 @@ public class MainActivity extends AppCompatActivity {
     @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // Apply status bar style BEFORE setContentView
         applyStatusBarSetting();
 
         super.onCreate(savedInstanceState);
@@ -78,9 +78,14 @@ public class MainActivity extends AppCompatActivity {
         webView = findViewById(R.id.webView);
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 
-        // Zero out any inset padding the system applies to the WebView
+        // After layout is ready, read actual status bar height and apply top padding
         ViewCompat.setOnApplyWindowInsetsListener(webView, (v, insets) -> {
-            v.setPadding(0, 0, 0, 0);
+            int statusBarHeight = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top;
+            int extraDp = getTopMarginOffsetDp();
+            int extraPx = dpToPx(extraDp);
+            int totalPadding = statusBarHeight + extraPx;
+            v.setPadding(0, totalPadding, 0, 0);
+            Log.d(TAG, "Status bar height: " + statusBarHeight + "px, extra: " + extraPx + "px, total: " + totalPadding + "px");
             return WindowInsetsCompat.CONSUMED;
         });
 
@@ -97,6 +102,7 @@ public class MainActivity extends AppCompatActivity {
         applyScreenOnSetting();
         acquireWakeLock();
         applyTextZoom();
+        applyTopMargin();
 
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         String url     = prefs.getString("dashboard_url", "");
@@ -130,16 +136,44 @@ public class MainActivity extends AppCompatActivity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             Window window = getWindow();
             if (transparent) {
-                // Transparent — status bar overlays content
                 window.addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
                 window.setStatusBarColor(Color.TRANSPARENT);
             } else {
-                // Opaque solid colour matching toolbar
                 window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
                 window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
                 window.setStatusBarColor(Color.parseColor("#1a1a2e"));
             }
         }
+    }
+
+    // ─── Top Margin ───────────────────────────────────────────────────────────
+
+    /**
+     * Returns the extra dp offset chosen in settings (default 0).
+     * The status bar height is handled automatically via WindowInsets.
+     */
+    private int getTopMarginOffsetDp() {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        try {
+            return Integer.parseInt(prefs.getString("top_margin_offset", "0"));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Re-applies top padding when returning from settings in case the
+     * offset value changed. Uses the last known inset height.
+     */
+    private void applyTopMargin() {
+        ViewCompat.requestApplyInsets(webView);
+    }
+
+    private int dpToPx(int dp) {
+        return Math.round(TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP, dp,
+                getResources().getDisplayMetrics()
+        ));
     }
 
     // ─── Wake Lock ────────────────────────────────────────────────────────────

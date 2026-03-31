@@ -13,6 +13,8 @@
     <string name="pref_text_zoom_summary">Adjust the text size of the dashboard</string>
     <string name="pref_transparent_status_title">Transparent Status Bar</string>
     <string name="pref_transparent_status_summary">Toggle on/off to test status bar appearance (restart app after changing)</string>
+    <string name="pref_top_margin_title">Top Margin Offset</string>
+    <string name="pref_top_margin_summary">Extra spacing added on top of the auto-detected status bar height</string>
     <string name="battery_opt_title">Battery Optimisation</string>
     <string name="battery_opt_message">For reliable printing, allow Kitchen Dashboard to run unrestricted in the background. Tap OK to open battery settings.</string>
     <string name="battery_opt_ok">Open Settings</string>
@@ -34,6 +36,26 @@
         <item>110</item>
         <item>125</item>
         <item>150</item>
+    </string-array>
+
+    <string-array name="top_margin_entries">
+        <item>Auto (status bar height)</item>
+        <item>Auto + 4dp</item>
+        <item>Auto + 8dp</item>
+        <item>Auto + 12dp</item>
+        <item>Auto + 16dp</item>
+        <item>Auto + 24dp</item>
+        <item>Auto + 32dp</item>
+    </string-array>
+
+    <string-array name="top_margin_values">
+        <item>0</item>
+        <item>4</item>
+        <item>8</item>
+        <item>12</item>
+        <item>16</item>
+        <item>24</item>
+        <item>32</item>
     </string-array>
 
     <string-array name="paper_width_entries">

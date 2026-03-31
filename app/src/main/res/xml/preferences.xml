@@ -31,6 +31,14 @@
             android:title="@string/pref_transparent_status_title"
             android:summary="@string/pref_transparent_status_summary"
             android:defaultValue="false" />
+        <ListPreference
+            android:key="top_margin_offset"
+            android:title="@string/pref_top_margin_title"
+            android:summary="@string/pref_top_margin_summary"
+            android:dialogTitle="Top Margin Offset"
+            android:entries="@array/top_margin_entries"
+            android:entryValues="@array/top_margin_values"
+            android:defaultValue="0" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="Printer">
