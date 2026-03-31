@@ -11,6 +11,8 @@
     <string name="pref_auto_reconnect_summary">Automatically reconnect if the Bluetooth connection drops</string>
     <string name="pref_text_zoom_title">Text Zoom</string>
     <string name="pref_text_zoom_summary">Adjust the text size of the dashboard</string>
+    <string name="pref_transparent_status_title">Transparent Status Bar</string>
+    <string name="pref_transparent_status_summary">Toggle on/off to test status bar appearance (restart app after changing)</string>
     <string name="battery_opt_title">Battery Optimisation</string>
     <string name="battery_opt_message">For reliable printing, allow Kitchen Dashboard to run unrestricted in the background. Tap OK to open battery settings.</string>
     <string name="battery_opt_ok">Open Settings</string>

@@ -9,6 +9,7 @@ import android.bluetooth.BluetoothSocket;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -19,6 +20,7 @@ import android.provider.Settings;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
@@ -67,17 +69,19 @@ public class MainActivity extends AppCompatActivity {
     @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Apply status bar style BEFORE setContentView
+        applyStatusBarSetting();
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
         webView = findViewById(R.id.webView);
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 
-        // Zero out any top inset the system tries to apply to the WebView
-        // This prevents the status-bar-height gap appearing below the toolbar
+        // Zero out any inset padding the system applies to the WebView
         ViewCompat.setOnApplyWindowInsetsListener(webView, (v, insets) -> {
             v.setPadding(0, 0, 0, 0);
-            return insets;
+            return WindowInsetsCompat.CONSUMED;
         });
 
         applyScreenOnSetting();
@@ -115,6 +119,27 @@ public class MainActivity extends AppCompatActivity {
         cancelAutoReconnect();
         closeBluetoothSocket();
         releaseWakeLock();
+    }
+
+    // ─── Status Bar ───────────────────────────────────────────────────────────
+
+    private void applyStatusBarSetting() {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        boolean transparent = prefs.getBoolean("transparent_status_bar", false);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            Window window = getWindow();
+            if (transparent) {
+                // Transparent — status bar overlays content
+                window.addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+                window.setStatusBarColor(Color.TRANSPARENT);
+            } else {
+                // Opaque solid colour matching toolbar
+                window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+                window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+                window.setStatusBarColor(Color.parseColor("#1a1a2e"));
+            }
+        }
     }
 
     // ─── Wake Lock ────────────────────────────────────────────────────────────

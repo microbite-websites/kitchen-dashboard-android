@@ -26,6 +26,11 @@
             android:entries="@array/text_zoom_entries"
             android:entryValues="@array/text_zoom_values"
             android:defaultValue="100" />
+        <SwitchPreferenceCompat
+            android:key="transparent_status_bar"
+            android:title="@string/pref_transparent_status_title"
+            android:summary="@string/pref_transparent_status_summary"
+            android:defaultValue="false" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="Printer">
