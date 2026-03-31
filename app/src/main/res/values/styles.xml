@@ -2,13 +2,15 @@
 <resources>
     <style name="Theme.KitchenDashboard" parent="Theme.AppCompat.Light.DarkActionBar">
         <item name="colorPrimary">#1a1a2e</item>
-        <item name="colorPrimaryDark">#16213e</item>
+        <item name="colorPrimaryDark">#1a1a2e</item>
         <item name="colorAccent">#e94560</item>
         <item name="windowActionBar">true</item>
         <item name="windowNoTitle">false</item>
         <item name="android:windowContentOverlay">@null</item>
         <item name="actionBarSize">40dp</item>
-        <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:windowTranslucentStatus">false</item>
         <item name="android:windowTranslucentNavigation">false</item>
+        <item name="android:statusBarColor">#1a1a2e</item>
+        <item name="android:fitsSystemWindows">true</item>
     </style>
 </resources>

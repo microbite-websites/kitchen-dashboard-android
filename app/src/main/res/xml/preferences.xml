@@ -2,7 +2,6 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
 
     <PreferenceCategory android:title="Dashboard">
-
         <EditTextPreference
             android:key="dashboard_url"
             android:title="Dashboard URL"
@@ -11,21 +10,25 @@
             android:inputType="textUri"
             android:singleLine="true"
             android:dialogTitle="Dashboard URL" />
-
     </PreferenceCategory>
 
     <PreferenceCategory android:title="Display &amp; Background">
-
         <SwitchPreferenceCompat
             android:key="keep_screen_on"
             android:title="@string/pref_keep_screen_on_title"
             android:summary="@string/pref_keep_screen_on_summary"
             android:defaultValue="true" />
-
+        <ListPreference
+            android:key="text_zoom"
+            android:title="@string/pref_text_zoom_title"
+            android:summary="@string/pref_text_zoom_summary"
+            android:dialogTitle="Text Zoom"
+            android:entries="@array/text_zoom_entries"
+            android:entryValues="@array/text_zoom_values"
+            android:defaultValue="100" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="Printer">
-
         <ListPreference
             android:key="printer_name"
             android:title="Bluetooth Printer"
@@ -33,7 +36,6 @@
             android:dialogTitle="Select Printer"
             android:entries="@array/empty_array"
             android:entryValues="@array/empty_array" />
-
         <ListPreference
             android:key="paper_width"
             android:title="Paper Width"
@@ -42,13 +44,11 @@
             android:entries="@array/paper_width_entries"
             android:entryValues="@array/paper_width_values"
             android:defaultValue="58" />
-
         <SwitchPreferenceCompat
             android:key="auto_reconnect"
             android:title="@string/pref_auto_reconnect_title"
             android:summary="@string/pref_auto_reconnect_summary"
             android:defaultValue="true" />
-
     </PreferenceCategory>
 
 </PreferenceScreen>
