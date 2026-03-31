@@ -79,6 +79,7 @@ public class MainActivity extends AppCompatActivity {
 
         applyScreenOnSetting();
         setupWebView();
+        applyTextZoom(); // Apply the zoom setting when the app starts
         requestPermissions();
         promptBatteryOptimisation();
         loadDashboard();
@@ -89,6 +90,7 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         applyScreenOnSetting();
         acquireWakeLock();
+        applyTextZoom(); // Apply the zoom setting every time we come back from the Settings screen
 
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         String url     = prefs.getString("dashboard_url", "");
@@ -113,6 +115,40 @@ public class MainActivity extends AppCompatActivity {
         releaseWakeLock();
     }
 
+    // ─── App Settings Logic ───────────────────────────────────────────────────
+
+    private void applyTextZoom() {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        int zoom = 100; // Default to 100%
+        try {
+            // Check the SharedPreferences for the zoom setting (Assuming key is "text_zoom")
+            Object zoomObj = prefs.getAll().get("text_zoom");
+            if (zoomObj != null) {
+                if (zoomObj instanceof String) {
+                    zoom = Integer.parseInt((String) zoomObj);
+                } else if (zoomObj instanceof Integer) {
+                    zoom = (Integer) zoomObj;
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error reading text zoom setting", e);
+        }
+        
+        if (webView != null) {
+            webView.getSettings().setTextZoom(zoom);
+        }
+    }
+
+    private void applyScreenOnSetting() {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        boolean keepOn = prefs.getBoolean("keep_screen_on", true);
+        if (keepOn) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        } else {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
+    }
+
     // ─── Wake Lock ────────────────────────────────────────────────────────────
 
     private void acquireWakeLock() {
@@ -132,16 +168,6 @@ public class MainActivity extends AppCompatActivity {
         if (wakeLock != null && wakeLock.isHeld()) {
             wakeLock.release();
             Log.d(TAG, "Wake lock released");
-        }
-    }
-
-    private void applyScreenOnSetting() {
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        boolean keepOn = prefs.getBoolean("keep_screen_on", true);
-        if (keepOn) {
-            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        } else {
-            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
     }
 
@@ -180,7 +206,7 @@ public class MainActivity extends AppCompatActivity {
         settings.setDomStorageEnabled(true);
         settings.setLoadWithOverviewMode(true);
         settings.setUseWideViewPort(true);
-        settings.setBuiltInZoomControls(false);
+        settings.setBuiltInZoomControls(false); // Set to true if you want finger pinch-to-zoom!
         settings.setDisplayZoomControls(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
 
