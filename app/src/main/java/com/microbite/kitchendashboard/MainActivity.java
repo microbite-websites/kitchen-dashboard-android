@@ -78,14 +78,22 @@ public class MainActivity extends AppCompatActivity {
         webView = findViewById(R.id.webView);
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 
-        // After layout is ready, read actual status bar height and apply top padding
+        // Only apply top padding when transparent status bar is ON
+        // When opaque, the system stacks everything correctly with zero padding
         ViewCompat.setOnApplyWindowInsetsListener(webView, (v, insets) -> {
-            int statusBarHeight = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top;
-            int extraDp = getTopMarginOffsetDp();
-            int extraPx = dpToPx(extraDp);
-            int totalPadding = statusBarHeight + extraPx;
-            v.setPadding(0, totalPadding, 0, 0);
-            Log.d(TAG, "Status bar height: " + statusBarHeight + "px, extra: " + extraPx + "px, total: " + totalPadding + "px");
+            SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+            boolean transparent = prefs.getBoolean("transparent_status_bar", false);
+
+            if (transparent) {
+                int statusBarHeight = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top;
+                int extraPx = dpToPx(getTopMarginOffsetDp());
+                int totalPadding = statusBarHeight + extraPx;
+                v.setPadding(0, totalPadding, 0, 0);
+                Log.d(TAG, "Transparent ON — top padding: " + totalPadding + "px (statusBar=" + statusBarHeight + " extra=" + extraPx + ")");
+            } else {
+                v.setPadding(0, 0, 0, 0);
+                Log.d(TAG, "Transparent OFF — top padding: 0");
+            }
             return WindowInsetsCompat.CONSUMED;
         });
 
@@ -102,7 +110,7 @@ public class MainActivity extends AppCompatActivity {
         applyScreenOnSetting();
         acquireWakeLock();
         applyTextZoom();
-        applyTopMargin();
+        ViewCompat.requestApplyInsets(webView);
 
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         String url     = prefs.getString("dashboard_url", "");
@@ -148,10 +156,6 @@ public class MainActivity extends AppCompatActivity {
 
     // ─── Top Margin ───────────────────────────────────────────────────────────
 
-    /**
-     * Returns the extra dp offset chosen in settings (default 0).
-     * The status bar height is handled automatically via WindowInsets.
-     */
     private int getTopMarginOffsetDp() {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         try {
@@ -159,14 +163,6 @@ public class MainActivity extends AppCompatActivity {
         } catch (NumberFormatException e) {
             return 0;
         }
-    }
-
-    /**
-     * Re-applies top padding when returning from settings in case the
-     * offset value changed. Uses the last known inset height.
-     */
-    private void applyTopMargin() {
-        ViewCompat.requestApplyInsets(webView);
     }
 
     private int dpToPx(int dp) {
