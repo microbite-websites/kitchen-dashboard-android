@@ -29,6 +29,8 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.preference.PreferenceManager;
 
 import java.io.IOException;
@@ -70,6 +72,13 @@ public class MainActivity extends AppCompatActivity {
 
         webView = findViewById(R.id.webView);
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+
+        // Zero out any top inset the system tries to apply to the WebView
+        // This prevents the status-bar-height gap appearing below the toolbar
+        ViewCompat.setOnApplyWindowInsetsListener(webView, (v, insets) -> {
+            v.setPadding(0, 0, 0, 0);
+            return insets;
+        });
 
         applyScreenOnSetting();
         setupWebView();
