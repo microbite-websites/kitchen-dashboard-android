@@ -6,5 +6,9 @@
         <item name="colorAccent">#e94560</item>
         <item name="windowActionBar">true</item>
         <item name="windowNoTitle">false</item>
+        <!-- Remove the gap below the action bar -->
+        <item name="android:windowContentOverlay">@null</item>
+        <!-- Make toolbar thinner -->
+        <item name="actionBarSize">40dp</item>
     </style>
 </resources>
