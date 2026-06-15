@@ -5,6 +5,11 @@
     <string name="menu_settings">Settings</string>
     <string name="menu_reload">Reload</string>
     <string name="menu_connect">Connect Printer</string>
+    <string name="pref_scan_qr_title">Scan QR Code</string>
+    <string name="pref_scan_qr_summary">Point your camera at the dashboard QR code to fill in the URL automatically</string>
+    <string name="scan_qr_prompt">Scan the dashboard QR code</string>
+    <string name="scan_qr_invalid">That QR code isn\'t a dashboard URL. It must start with http:// or https://</string>
+    <string name="scan_qr_saved">Dashboard URL set from QR code</string>
     <string name="pref_keep_screen_on_title">Keep Screen On</string>
     <string name="pref_keep_screen_on_summary">Prevent screen from dimming while app is open (recommended when plugged in)</string>
     <string name="pref_auto_reconnect_title">Auto-Reconnect Printer</string>

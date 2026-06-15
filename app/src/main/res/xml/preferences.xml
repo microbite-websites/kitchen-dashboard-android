@@ -10,6 +10,10 @@
             android:inputType="textUri"
             android:singleLine="true"
             android:dialogTitle="Dashboard URL" />
+        <Preference
+            android:key="scan_qr"
+            android:title="@string/pref_scan_qr_title"
+            android:summary="@string/pref_scan_qr_summary" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="Display &amp; Background">

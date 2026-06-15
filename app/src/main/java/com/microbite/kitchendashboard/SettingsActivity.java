@@ -17,9 +17,13 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import androidx.preference.EditTextPreference;
 import androidx.preference.ListPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
+
+import com.journeyapps.barcodescanner.ScanContract;
+import com.journeyapps.barcodescanner.ScanOptions;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -53,6 +57,7 @@ public class SettingsActivity extends AppCompatActivity {
 
         private ActivityResultLauncher<String> btPermissionLauncher;
         private ActivityResultLauncher<Intent> enableBtLauncher;
+        private ActivityResultLauncher<ScanOptions> qrScanLauncher;
 
         @Override
         public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
@@ -76,7 +81,46 @@ public class SettingsActivity extends AppCompatActivity {
                     new ActivityResultContracts.StartActivityForResult(),
                     result -> populatePrinterList());
 
+            qrScanLauncher = registerForActivityResult(
+                    new ScanContract(),
+                    result -> {
+                        if (result.getContents() != null) {
+                            applyScannedUrl(result.getContents().trim());
+                        }
+                    });
+
+            Preference scanPref = findPreference("scan_qr");
+            if (scanPref != null) {
+                scanPref.setOnPreferenceClickListener(p -> {
+                    launchQrScanner();
+                    return true;
+                });
+            }
+
             populatePrinterList();
+        }
+
+        /** Opens the bundled ZXing scanner. It requests the CAMERA permission itself. */
+        private void launchQrScanner() {
+            ScanOptions options = new ScanOptions();
+            options.setDesiredBarcodeFormats(ScanOptions.QR_CODE);
+            options.setPrompt(getString(R.string.scan_qr_prompt));
+            options.setBeepEnabled(true);
+            options.setOrientationLocked(false);
+            qrScanLauncher.launch(options);
+        }
+
+        /** Validates the scanned text is a dashboard URL and stores it. */
+        private void applyScannedUrl(String scanned) {
+            if (!scanned.startsWith("http://") && !scanned.startsWith("https://")) {
+                Toast.makeText(requireContext(), R.string.scan_qr_invalid, Toast.LENGTH_LONG).show();
+                return;
+            }
+            EditTextPreference urlPref = findPreference("dashboard_url");
+            if (urlPref != null) {
+                urlPref.setText(scanned);   // persists to SharedPreferences + updates the dialog
+            }
+            Toast.makeText(requireContext(), R.string.scan_qr_saved, Toast.LENGTH_SHORT).show();
         }
 
         /**
