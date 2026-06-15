@@ -10,8 +10,16 @@ android {
         applicationId "com.microbite.kitchendashboard"
         minSdk 21
         targetSdk 34
-        versionCode 4
-        versionName "1.1.2"
+        versionCode 5
+        versionName "1.1.3"
+    }
+
+    // Give built APKs a memorable, versioned filename instead of app-debug.apk
+    // e.g. mbpos-kitchen-v1.1.3-debug.apk
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            output.outputFileName = "mbpos-kitchen-v${variant.versionName}-${variant.buildType.name}.apk"
+        }
     }
 
     buildTypes {

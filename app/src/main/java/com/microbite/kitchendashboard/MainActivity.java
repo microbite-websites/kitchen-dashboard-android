@@ -472,8 +472,12 @@ public class MainActivity extends AppCompatActivity {
 
                 closeBluetoothSocket();
 
+                // NOTE: we deliberately do NOT call bluetoothAdapter.cancelDiscovery()
+                // here. On Android 12+ it requires BLUETOOTH_SCAN, which this app
+                // doesn't hold (Play compliance — we only connect to bonded devices,
+                // never scan). Calling it would throw SecurityException on this
+                // background thread and crash the process.
                 BluetoothSocket socket = targetDevice.createRfcommSocketToServiceRecord(SPP_UUID);
-                bluetoothAdapter.cancelDiscovery();
                 socket.connect();
                 bluetoothSocket = socket;
                 outputStream = socket.getOutputStream();
@@ -494,6 +498,16 @@ public class MainActivity extends AppCompatActivity {
                     isConnecting = false;
                     setStatus(PrinterStatus.DISCONNECTED);
                     scheduleAutoReconnect();
+                });
+            } catch (Exception e) {
+                // SecurityException (a missing BT permission) or anything else
+                // unexpected. This runs on a background thread, so an uncaught
+                // exception here would terminate the whole app — never let that
+                // happen. Re-derive the real reason and stop quietly.
+                Log.e(TAG, "Bluetooth connect error — aborting without crashing", e);
+                mainHandler.post(() -> {
+                    isConnecting = false;
+                    setStatus(checkReadiness());
                 });
             }
         });

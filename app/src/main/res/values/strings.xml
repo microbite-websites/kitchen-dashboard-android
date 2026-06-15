@@ -27,7 +27,7 @@
     <string name="printer_permission_denied_msg">Bluetooth permission was denied. Open app settings and allow \"Nearby devices\" to connect your printer.</string>
     <string name="printer_bt_off_msg">Bluetooth is turned off. Turn it on to connect your receipt printer.</string>
     <string name="printer_none_selected_msg">No printer has been selected yet. Open Settings to choose your paired Bluetooth printer.</string>
-    <string name="printer_not_paired_msg">The selected printer isn\'t paired with this device. Pair it in Android Bluetooth settings first.</string>
+    <string name="printer_not_paired_msg">No paired printer found.\n\nTo pair your receipt printer:\n1. Turn the printer on.\n2. Tap \"Bluetooth Settings\" below.\n3. Choose your printer (e.g. \"PT-210\") and pair it.\n4. If asked for a PIN, enter 0000.\n\nThen come back and select it here.</string>
     <string name="printer_action_grant">Grant Permission</string>
     <string name="printer_action_app_settings">Open App Settings</string>
     <string name="printer_action_turn_on">Turn On Bluetooth</string>
@@ -39,7 +39,7 @@
     <string name="settings_printer_select">Select your paired Bluetooth printer</string>
     <string name="settings_printer_need_permission">Bluetooth permission needed — tap to grant, then reopen this list</string>
     <string name="settings_printer_bt_off">Bluetooth is off — turn it on to see paired printers</string>
-    <string name="settings_printer_none_paired">No paired Bluetooth devices found. Pair your printer in Android Settings first.</string>
+    <string name="settings_printer_none_paired">No paired printer found — tap to pair (printer on, PIN 0000, e.g. \"PT-210\")</string>
 
     <string-array name="text_zoom_entries">
         <item>75%</item>
