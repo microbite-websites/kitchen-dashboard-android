@@ -21,6 +21,8 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -272,6 +274,10 @@ public class MainActivity extends AppCompatActivity {
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        // Let the new-order chime play without a tap first. The dashboard builds
+        // a fresh AudioContext per order, which otherwise stays suspended in a
+        // WebView until the user interacts — meaning a missed audible alert.
+        settings.setMediaPlaybackRequiresUserGesture(false);
 
         webView.addJavascriptInterface(new PrintBridge(), "KDPrint");
 
@@ -281,7 +287,47 @@ public class MainActivity extends AppCompatActivity {
                 super.onPageFinished(view, url);
                 webView.evaluateJavascript("window.kdAndroidBridge = true;", null);
             }
+
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                // Only replace the page when the main document itself fails to
+                // load (no network, bad URL, server down) — never for a missing
+                // sub-resource like a favicon or font.
+                if (request.isForMainFrame()) {
+                    showErrorPage();
+                }
+            }
         });
+    }
+
+    /**
+     * Friendly, branded "can't reach dashboard" screen with a Try Again button,
+     * shown instead of the WebView's blank default error. Tapping Try Again
+     * re-navigates to the configured dashboard URL.
+     */
+    private void showErrorPage() {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        String url  = prefs.getString("dashboard_url", "");
+        String safe = url.replace("\\", "\\\\").replace("'", "\\'");
+        String html =
+                "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+              + "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+              + "<style>html,body{height:100%;margin:0}"
+              + "body{font-family:sans-serif;background:#1f2430;color:#e8eaed;"
+              + "display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;box-sizing:border-box}"
+              + ".card{max-width:420px}.ico{font-size:56px;margin-bottom:8px}"
+              + "h1{font-size:22px;margin:0 0 12px}p{color:#aab2c0;line-height:1.55;margin:0 0 22px}"
+              + "button{background:#2271b1;color:#fff;border:0;border-radius:10px;"
+              + "padding:15px 30px;font-size:16px;font-weight:700}"
+              + ".hint{font-size:13px;color:#7b8694;margin-top:18px}</style></head>"
+              + "<body><div class='card'><div class='ico'>\uD83D\uDCE1</div>"
+              + "<h1>Can\u2019t reach the dashboard</h1>"
+              + "<p>Make sure this device is connected to Wi\u2011Fi or mobile data, then try again. "
+              + "If it keeps failing, check the dashboard URL in Settings.</p>"
+              + "<button onclick=\"location.href='" + safe + "'\">Try Again</button>"
+              + "<div class='hint'>Menu \u2192 Settings to change the dashboard URL</div>"
+              + "</div></body></html>";
+        webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
     }
 
     private void loadDashboard() {
