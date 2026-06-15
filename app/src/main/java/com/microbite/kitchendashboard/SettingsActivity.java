@@ -47,6 +47,10 @@ public class SettingsActivity extends AppCompatActivity {
 
         private ActivityResultLauncher<String> btPermissionLauncher;
 
+        // Ask for Bluetooth permission at most once per visit. Without this,
+        // denying the prompt re-triggers populate → re-request → infinite loop.
+        private boolean permissionRequested = false;
+
         @Override
         public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
             setPreferencesFromResource(R.xml.preferences, rootKey);
@@ -77,11 +81,13 @@ public class SettingsActivity extends AppCompatActivity {
                 return;
             }
 
-            // Ask for permission inline so the list can actually be populated
-            // instead of dead-ending on a SecurityException.
+            // Ask for permission inline (once) so the list can be populated
+            // instead of dead-ending on a SecurityException. Re-requesting from
+            // the denial callback would loop, so guard with permissionRequested.
             if (!hasBluetoothConnectPermission()) {
                 printerPref.setSummary(R.string.settings_printer_need_permission);
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (!permissionRequested && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    permissionRequested = true;
                     btPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT);
                 }
                 return;
