@@ -9,18 +9,23 @@ import android.bluetooth.BluetoothSocket;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkRequest;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
+import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
@@ -36,6 +41,8 @@ import androidx.preference.PreferenceManager;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -92,6 +99,37 @@ public class MainActivity extends AppCompatActivity {
     private ActivityResultLauncher<String> btPermissionLauncher;
     private ActivityResultLauncher<Intent> enableBtLauncher;
 
+    // ─── Reliability features (each toggleable in Settings) ───────────────────
+
+    // #3 — auto-reload when the network comes back, plus a once-a-day refresh
+    private ConnectivityManager connectivityManager;
+    private ConnectivityManager.NetworkCallback networkCallback;
+    private volatile boolean loadFailed = false;
+    private static final long DAILY_REFRESH_MS = 24L * 60 * 60 * 1000;
+    private final Runnable dailyRefreshRunnable = new Runnable() {
+        @Override public void run() {
+            if (webView != null) webView.reload();
+            mainHandler.postDelayed(this, DAILY_REFRESH_MS);
+        }
+    };
+
+    // #2 — recover from a WebView render-process crash; guard against tight loops
+    private long lastRenderRecoveryMs = 0L;
+
+    // #7 — print queue: jobs that arrive while disconnected are held briefly
+    // (under the dashboard's fallback timeout) and flushed once reconnected,
+    // so a docket fired mid-reconnect still reaches the Bluetooth printer.
+    private static final int  PRINT_QUEUE_MAX        = 20;
+    private static final long PRINT_QUEUE_TIMEOUT_MS = 5000;
+    private final List<QueuedPrint> printQueue = new ArrayList<>();
+
+    private final class QueuedPrint {
+        final String hex;
+        final String jobId;
+        Runnable timeout;
+        QueuedPrint(String hex, String jobId) { this.hex = hex; this.jobId = jobId; }
+    }
+
     // ─── Lifecycle ────────────────────────────────────────────────────────────
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -129,6 +167,14 @@ public class MainActivity extends AppCompatActivity {
             webView.loadUrl(url);
         }
 
+        // Reconcile network monitoring with the current toggle state so a change
+        // made in Settings takes effect as soon as we return to the dashboard.
+        if (prefs.getBoolean("auto_reload_network", true)) {
+            startNetworkMonitoring();
+        } else {
+            stopNetworkMonitoring();
+        }
+
         // Reconnect automatically if a printer is configured and ready but the
         // socket isn't live (e.g. it dropped while we were backgrounded).
         if (status != PrinterStatus.CONNECTED && !isConnecting
@@ -152,6 +198,7 @@ public class MainActivity extends AppCompatActivity {
         cancelAutoReconnect();
         closeBluetoothSocket();
         releaseWakeLock();
+        stopNetworkMonitoring();
     }
 
     // ─── Activity result launchers ────────────────────────────────────────────
@@ -233,6 +280,52 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // ─── Network-recovery auto-reload + daily refresh (#3) ────────────────────
+
+    private void startNetworkMonitoring() {
+        if (connectivityManager == null) {
+            connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        }
+        if (connectivityManager == null) return;
+
+        if (networkCallback == null) {
+            networkCallback = new ConnectivityManager.NetworkCallback() {
+                @Override public void onAvailable(Network network) {
+                    // Fires on a background thread — hop to the UI thread before
+                    // touching the WebView. Only reload if the page actually
+                    // failed, so a normal connectivity blip costs nothing.
+                    mainHandler.post(() -> {
+                        if (loadFailed && webView != null) {
+                            loadFailed = false;
+                            webView.reload();
+                        }
+                    });
+                }
+            };
+            try {
+                NetworkRequest req = new NetworkRequest.Builder().build();
+                connectivityManager.registerNetworkCallback(req, networkCallback);
+            } catch (Exception e) {
+                Log.w(TAG, "Could not register network callback", e);
+                networkCallback = null;
+            }
+        }
+
+        // (Re)arm the once-a-day refresh.
+        mainHandler.removeCallbacks(dailyRefreshRunnable);
+        mainHandler.postDelayed(dailyRefreshRunnable, DAILY_REFRESH_MS);
+    }
+
+    private void stopNetworkMonitoring() {
+        if (connectivityManager != null && networkCallback != null) {
+            try {
+                connectivityManager.unregisterNetworkCallback(networkCallback);
+            } catch (Exception e) { /* wasn't registered */ }
+        }
+        networkCallback = null;
+        mainHandler.removeCallbacks(dailyRefreshRunnable);
+    }
+
     // ─── Battery Optimisation ─────────────────────────────────────────────────
 
     private void promptBatteryOptimisation() {
@@ -285,6 +378,12 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
+                // Only a real http(s) load counts as success; the offline
+                // fallback page (loadDataWithBaseURL) must NOT clear the flag,
+                // otherwise network-recovery reload wouldn't fire.
+                if (url != null && (url.startsWith("http://") || url.startsWith("https://"))) {
+                    loadFailed = false;
+                }
                 webView.evaluateJavascript("window.kdAndroidBridge = true;", null);
             }
 
@@ -294,8 +393,29 @@ public class MainActivity extends AppCompatActivity {
                 // load (no network, bad URL, server down) — never for a missing
                 // sub-resource like a favicon or font.
                 if (request.isForMainFrame()) {
+                    loadFailed = true;
                     showErrorPage();
                 }
+            }
+
+            @Override
+            public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                // The WebView's render process died (OS reclaimed memory, or the
+                // page crashed). That WebView object is now unusable; returning
+                // true tells the system we've handled it so the WHOLE APP is not
+                // killed. When recovery is on we rebuild the Activity from
+                // scratch (fresh WebView, reloads the dashboard).
+                Log.w(TAG, "WebView render process gone (crashed="
+                        + (detail != null && detail.didCrash()) + ")");
+                SharedPreferences p = PreferenceManager.getDefaultSharedPreferences(MainActivity.this);
+                boolean recover = p.getBoolean("auto_recover_crash", true);
+                long now = SystemClock.elapsedRealtime();
+                // 10s guard stops a crash-on-load page from looping forever.
+                if (recover && now - lastRenderRecoveryMs > 10_000) {
+                    lastRenderRecoveryMs = now;
+                    mainHandler.post(MainActivity.this::recreate);
+                }
+                return true;
             }
         });
     }
@@ -536,6 +656,7 @@ public class MainActivity extends AppCompatActivity {
                     setStatus(PrinterStatus.CONNECTED);
                     Toast.makeText(this, "✅ Printer connected!", Toast.LENGTH_SHORT).show();
                     Log.d(TAG, "Printer connected successfully");
+                    flushPrintQueue();
                 });
 
             } catch (IOException e) {
@@ -661,14 +782,22 @@ public class MainActivity extends AppCompatActivity {
         executor.execute(() -> {
             OutputStream os = outputStream;
             if (os == null) {
-                reportPrintResult(jobId, false, "not_connected");
-                // Kick off a reconnect so the next docket has a chance
-                mainHandler.post(() -> {
-                    if (!isConnecting && checkReadiness() == PrinterStatus.DISCONNECTED) {
-                        reconnectAttempt = 0;
-                        connectPrinter();
-                    }
-                });
+                SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(MainActivity.this);
+                boolean queueEnabled = prefs.getBoolean("print_queue", true);
+                // Only queue jobs that carry an id (so the result can be matched
+                // and a timeout reported). Legacy no-id prints keep the old path.
+                if (queueEnabled && jobId != null) {
+                    mainHandler.post(() -> enqueuePrintJob(hexData, jobId));
+                } else {
+                    reportPrintResult(jobId, false, "not_connected");
+                    // Kick off a reconnect so the next docket has a chance
+                    mainHandler.post(() -> {
+                        if (!isConnecting && checkReadiness() == PrinterStatus.DISCONNECTED) {
+                            reconnectAttempt = 0;
+                            connectPrinter();
+                        }
+                    });
+                }
                 return;
             }
 
@@ -707,6 +836,49 @@ public class MainActivity extends AppCompatActivity {
                 + jsonEscape(jobId) + "'," + ok + ","
                 + (reason == null ? "null" : "'" + reason + "'") + ");}";
         mainHandler.post(() -> webView.evaluateJavascript(js, null));
+    }
+
+    // ─── Print queue (#7) — all access on the main thread ─────────────────────
+
+    /**
+     * Holds a docket that arrived while the printer was offline and triggers a
+     * reconnect. If we connect within {@link #PRINT_QUEUE_TIMEOUT_MS} the job is
+     * flushed to the printer; otherwise it's reported as failed so the dashboard
+     * still falls back to browser printing (the timeout is deliberately shorter
+     * than the dashboard's own fallback, so we never double-print).
+     */
+    private void enqueuePrintJob(String hex, String jobId) {
+        // Drop the oldest if the buffer is full, failing it cleanly.
+        while (printQueue.size() >= PRINT_QUEUE_MAX) {
+            QueuedPrint old = printQueue.remove(0);
+            mainHandler.removeCallbacks(old.timeout);
+            reportPrintResult(old.jobId, false, "queue_full");
+        }
+
+        final QueuedPrint job = new QueuedPrint(hex, jobId);
+        job.timeout = () -> {
+            if (printQueue.remove(job)) {
+                reportPrintResult(job.jobId, false, "timeout");
+            }
+        };
+        printQueue.add(job);
+        mainHandler.postDelayed(job.timeout, PRINT_QUEUE_TIMEOUT_MS);
+
+        if (!isConnecting && checkReadiness() == PrinterStatus.DISCONNECTED) {
+            reconnectAttempt = 0;
+            connectPrinter();
+        }
+    }
+
+    /** Re-sends every held docket now that the printer is connected. */
+    private void flushPrintQueue() {
+        if (printQueue.isEmpty()) return;
+        List<QueuedPrint> jobs = new ArrayList<>(printQueue);
+        printQueue.clear();
+        for (QueuedPrint job : jobs) {
+            mainHandler.removeCallbacks(job.timeout);
+            doPrint(job.hex, job.jobId);
+        }
     }
 
     // ─── Utilities ────────────────────────────────────────────────────────────

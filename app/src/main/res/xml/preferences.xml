@@ -66,6 +66,29 @@
             android:title="@string/pref_auto_reconnect_title"
             android:summary="@string/pref_auto_reconnect_summary"
             android:defaultValue="true" />
+        <SwitchPreferenceCompat
+            android:key="print_queue"
+            android:title="@string/pref_print_queue_title"
+            android:summary="@string/pref_print_queue_summary"
+            android:defaultValue="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/pref_cat_reliability">
+        <SwitchPreferenceCompat
+            android:key="auto_start_boot"
+            android:title="@string/pref_auto_start_title"
+            android:summary="@string/pref_auto_start_summary"
+            android:defaultValue="true" />
+        <SwitchPreferenceCompat
+            android:key="auto_recover_crash"
+            android:title="@string/pref_auto_recover_title"
+            android:summary="@string/pref_auto_recover_summary"
+            android:defaultValue="true" />
+        <SwitchPreferenceCompat
+            android:key="auto_reload_network"
+            android:title="@string/pref_auto_reload_title"
+            android:summary="@string/pref_auto_reload_summary"
+            android:defaultValue="true" />
     </PreferenceCategory>
 
 </PreferenceScreen>

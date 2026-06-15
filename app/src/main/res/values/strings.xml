@@ -14,6 +14,17 @@
     <string name="pref_keep_screen_on_summary">Prevent screen from dimming while app is open (recommended when plugged in)</string>
     <string name="pref_auto_reconnect_title">Auto-Reconnect Printer</string>
     <string name="pref_auto_reconnect_summary">Automatically reconnect if the Bluetooth connection drops</string>
+    <string name="pref_print_queue_title">Hold Prints Until Reconnected</string>
+    <string name="pref_print_queue_summary">If a docket is sent while the printer is reconnecting, hold it for a few seconds and print once reconnected (instead of failing straight away)</string>
+
+    <!-- Reliability category -->
+    <string name="pref_cat_reliability">Reliability</string>
+    <string name="pref_auto_start_title">Start on Phone Restart</string>
+    <string name="pref_auto_start_summary">Reopen the dashboard automatically after the device reboots (e.g. after a power cut). May not work on every device.</string>
+    <string name="pref_auto_recover_title">Auto-Recover if Screen Crashes</string>
+    <string name="pref_auto_recover_summary">Automatically reload the dashboard if the display ever crashes, instead of going blank</string>
+    <string name="pref_auto_reload_title">Auto-Reload on Wi-Fi Recovery</string>
+    <string name="pref_auto_reload_summary">Reload automatically when the internet comes back after a dropout, plus a once-a-day refresh to keep things fresh</string>
     <string name="pref_text_zoom_title">Text Zoom</string>
     <string name="pref_text_zoom_summary">Adjust the text size of the dashboard</string>
     <string name="pref_transparent_status_title">Transparent Status Bar</string>

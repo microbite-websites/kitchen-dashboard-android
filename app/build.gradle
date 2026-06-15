@@ -10,8 +10,8 @@ android {
         applicationId "com.microbite.kitchendashboard"
         minSdk 21
         targetSdk 34
-        versionCode 7
-        versionName "1.1.5"
+        versionCode 8
+        versionName "1.1.6"
     }
 
     // Give built APKs a memorable, versioned filename instead of app-debug.apk
