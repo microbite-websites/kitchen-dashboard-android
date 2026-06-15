@@ -2,17 +2,23 @@ package com.microbite.kitchendashboard;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
+import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.preference.ListPreference;
+import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 
 import java.util.ArrayList;
@@ -46,10 +52,7 @@ public class SettingsActivity extends AppCompatActivity {
     public static class SettingsFragment extends PreferenceFragmentCompat {
 
         private ActivityResultLauncher<String> btPermissionLauncher;
-
-        // Ask for Bluetooth permission at most once per visit. Without this,
-        // denying the prompt re-triggers populate → re-request → infinite loop.
-        private boolean permissionRequested = false;
+        private ActivityResultLauncher<Intent> enableBtLauncher;
 
         @Override
         public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
@@ -57,10 +60,108 @@ public class SettingsActivity extends AppCompatActivity {
 
             btPermissionLauncher = registerForActivityResult(
                     new ActivityResultContracts.RequestPermission(),
-                    granted -> populatePrinterList());
+                    granted -> {
+                        populatePrinterList();
+                        if (granted) {
+                            Toast.makeText(requireContext(),
+                                    R.string.settings_printer_select, Toast.LENGTH_SHORT).show();
+                        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                                && !shouldShowRequestPermissionRationale(Manifest.permission.BLUETOOTH_CONNECT)) {
+                            // Permanently denied ("Don't ask again") → only Settings can fix it
+                            showAppSettingsDialog();
+                        }
+                    });
+
+            enableBtLauncher = registerForActivityResult(
+                    new ActivityResultContracts.StartActivityForResult(),
+                    result -> populatePrinterList());
 
             populatePrinterList();
         }
+
+        /**
+         * Intercept the printer dialog: a ListPreference shows its picker from
+         * onClick(), so this is the only reliable place to stop an empty "None"
+         * list from opening. If the printer can't be chosen yet, explain why
+         * (and offer a fix) instead; otherwise let the normal picker show.
+         */
+        @Override
+        public void onDisplayPreferenceDialog(Preference preference) {
+            if ("printer_name".equals(preference.getKey()) && interceptPrinterDialog()) {
+                return;
+            }
+            super.onDisplayPreferenceDialog(preference);
+        }
+
+        // ─── Tap handler: explain / fix, or let the list open ──────────────────
+
+        /** @return true if we handled it (showed a reason/fix), false to open the picker. */
+        @SuppressLint("MissingPermission")
+        private boolean interceptPrinterDialog() {
+            BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+
+            if (adapter == null) {
+                showInfoDialog(R.string.printer_unsupported_msg);
+                return true; // consume — nothing to choose
+            }
+
+            if (!hasBluetoothConnectPermission()) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    btPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT);
+                }
+                return true;
+            }
+
+            if (!adapter.isEnabled()) {
+                new AlertDialog.Builder(requireContext())
+                        .setTitle(R.string.printer_dialog_title)
+                        .setMessage(R.string.printer_bt_off_msg)
+                        .setPositiveButton(R.string.printer_action_turn_on,
+                                (d, w) -> enableBtLauncher.launch(new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)))
+                        .setNegativeButton(R.string.printer_action_dismiss, null)
+                        .show();
+                return true;
+            }
+
+            if (countPairedPrinters(adapter) == 0) {
+                new AlertDialog.Builder(requireContext())
+                        .setTitle(R.string.printer_dialog_title)
+                        .setMessage(R.string.printer_not_paired_msg)
+                        .setPositiveButton(R.string.printer_action_bt_settings, (d, w) -> {
+                            try {
+                                startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS));
+                            } catch (Exception e) {
+                                startActivity(new Intent(Settings.ACTION_SETTINGS));
+                            }
+                        })
+                        .setNegativeButton(R.string.printer_action_dismiss, null)
+                        .show();
+                return true;
+            }
+
+            return false; // ready — let the normal printer picker open
+        }
+
+        private void showInfoDialog(int messageRes) {
+            new AlertDialog.Builder(requireContext())
+                    .setTitle(R.string.printer_dialog_title)
+                    .setMessage(messageRes)
+                    .setPositiveButton(R.string.printer_action_dismiss, null)
+                    .show();
+        }
+
+        private void showAppSettingsDialog() {
+            new AlertDialog.Builder(requireContext())
+                    .setTitle(R.string.printer_dialog_title)
+                    .setMessage(R.string.printer_permission_denied_msg)
+                    .setPositiveButton(R.string.printer_action_app_settings, (d, w) ->
+                            startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                    Uri.parse("package:" + requireContext().getPackageName()))))
+                    .setNegativeButton(R.string.printer_action_dismiss, null)
+                    .show();
+        }
+
+        // ─── Helpers ───────────────────────────────────────────────────────────
 
         private boolean hasBluetoothConnectPermission() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -71,6 +172,21 @@ public class SettingsActivity extends AppCompatActivity {
         }
 
         @SuppressLint("MissingPermission")
+        private int countPairedPrinters(BluetoothAdapter adapter) {
+            try {
+                Set<BluetoothDevice> bonded = adapter.getBondedDevices();
+                int n = 0;
+                for (BluetoothDevice d : bonded) {
+                    if (d.getName() != null) n++;
+                }
+                return n;
+            } catch (SecurityException e) {
+                return 0;
+            }
+        }
+
+        /** Keeps the summary line in sync so the reason is visible without tapping. */
+        @SuppressLint("MissingPermission")
         private void populatePrinterList() {
             ListPreference printerPref = findPreference("printer_name");
             if (printerPref == null) return;
@@ -80,19 +196,10 @@ public class SettingsActivity extends AppCompatActivity {
                 printerPref.setSummary(R.string.printer_unsupported_msg);
                 return;
             }
-
-            // Ask for permission inline (once) so the list can be populated
-            // instead of dead-ending on a SecurityException. Re-requesting from
-            // the denial callback would loop, so guard with permissionRequested.
             if (!hasBluetoothConnectPermission()) {
                 printerPref.setSummary(R.string.settings_printer_need_permission);
-                if (!permissionRequested && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    permissionRequested = true;
-                    btPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT);
-                }
                 return;
             }
-
             if (!adapter.isEnabled()) {
                 printerPref.setSummary(R.string.settings_printer_bt_off);
                 return;
