@@ -1,18 +1,19 @@
 package com.microbite.kitchendashboard;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
-import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
-import android.widget.ArrayAdapter;
-import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.preference.ListPreference;
-import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
-import androidx.preference.PreferenceManager;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -44,10 +45,25 @@ public class SettingsActivity extends AppCompatActivity {
 
     public static class SettingsFragment extends PreferenceFragmentCompat {
 
+        private ActivityResultLauncher<String> btPermissionLauncher;
+
         @Override
         public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
             setPreferencesFromResource(R.xml.preferences, rootKey);
+
+            btPermissionLauncher = registerForActivityResult(
+                    new ActivityResultContracts.RequestPermission(),
+                    granted -> populatePrinterList());
+
             populatePrinterList();
+        }
+
+        private boolean hasBluetoothConnectPermission() {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                return ContextCompat.checkSelfPermission(requireContext(),
+                        Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
+            }
+            return true;
         }
 
         @SuppressLint("MissingPermission")
@@ -57,7 +73,22 @@ public class SettingsActivity extends AppCompatActivity {
 
             BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
             if (adapter == null) {
-                printerPref.setSummary("Bluetooth not available on this device");
+                printerPref.setSummary(R.string.printer_unsupported_msg);
+                return;
+            }
+
+            // Ask for permission inline so the list can actually be populated
+            // instead of dead-ending on a SecurityException.
+            if (!hasBluetoothConnectPermission()) {
+                printerPref.setSummary(R.string.settings_printer_need_permission);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    btPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT);
+                }
+                return;
+            }
+
+            if (!adapter.isEnabled()) {
+                printerPref.setSummary(R.string.settings_printer_bt_off);
                 return;
             }
 
@@ -75,11 +106,13 @@ public class SettingsActivity extends AppCompatActivity {
                 printerPref.setEntries(entries);
                 printerPref.setEntryValues(entries);
 
-                if (pairedDevices.isEmpty()) {
-                    printerPref.setSummary("No paired Bluetooth devices found. Pair your printer in Android Settings first.");
+                if (names.size() <= 1) {
+                    printerPref.setSummary(R.string.settings_printer_none_paired);
+                } else {
+                    printerPref.setSummary(R.string.settings_printer_select);
                 }
             } catch (SecurityException e) {
-                printerPref.setSummary("Bluetooth permission required");
+                printerPref.setSummary(R.string.settings_printer_need_permission);
             }
         }
     }

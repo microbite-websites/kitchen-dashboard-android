@@ -16,9 +16,30 @@
     <string name="pref_top_margin_title">Top Margin Offset</string>
     <string name="pref_top_margin_summary">Extra spacing added on top of the auto-detected status bar height</string>
     <string name="battery_opt_title">Battery Optimisation</string>
-    <string name="battery_opt_message">For reliable printing, allow Kitchen Dashboard to run unrestricted in the background. Tap OK to open battery settings.</string>
+    <string name="battery_opt_message">For reliable printing, allow Kitchen Dashboard to run unrestricted in the background. Tap Open Settings, then choose Kitchen Dashboard and set it to \"Don\'t optimise\".</string>
     <string name="battery_opt_ok">Open Settings</string>
     <string name="battery_opt_cancel">Not Now</string>
+
+    <!-- Printer restriction dialogs -->
+    <string name="printer_dialog_title">Printer Unavailable</string>
+    <string name="printer_unsupported_msg">This device has no Bluetooth hardware, so receipt printing is not available.</string>
+    <string name="printer_permission_msg">Kitchen Dashboard needs Bluetooth permission to talk to your receipt printer.</string>
+    <string name="printer_permission_denied_msg">Bluetooth permission was denied. Open app settings and allow \"Nearby devices\" to connect your printer.</string>
+    <string name="printer_bt_off_msg">Bluetooth is turned off. Turn it on to connect your receipt printer.</string>
+    <string name="printer_none_selected_msg">No printer has been selected yet. Open Settings to choose your paired Bluetooth printer.</string>
+    <string name="printer_not_paired_msg">The selected printer isn\'t paired with this device. Pair it in Android Bluetooth settings first.</string>
+    <string name="printer_action_grant">Grant Permission</string>
+    <string name="printer_action_app_settings">Open App Settings</string>
+    <string name="printer_action_turn_on">Turn On Bluetooth</string>
+    <string name="printer_action_open_settings">Open Settings</string>
+    <string name="printer_action_bt_settings">Bluetooth Settings</string>
+    <string name="printer_action_dismiss">Dismiss</string>
+
+    <!-- Settings: printer list summaries -->
+    <string name="settings_printer_select">Select your paired Bluetooth printer</string>
+    <string name="settings_printer_need_permission">Bluetooth permission needed — tap to grant, then reopen this list</string>
+    <string name="settings_printer_bt_off">Bluetooth is off — turn it on to see paired printers</string>
+    <string name="settings_printer_none_paired">No paired Bluetooth devices found. Pair your printer in Android Settings first.</string>
 
     <string-array name="text_zoom_entries">
         <item>75%</item>

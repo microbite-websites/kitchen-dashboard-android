@@ -9,3 +9,9 @@
 .cxx
 local.properties
 app/build/
+
+# WordPress plugin kept locally for reference only — not part of this repo
+/wordpress-plugin/
+
+# Claude Code local agent/memory data
+/.claude/

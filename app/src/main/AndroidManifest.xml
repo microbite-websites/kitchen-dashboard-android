@@ -3,13 +3,21 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <!--
+      The app only ever talks to ALREADY-PAIRED printers (getBondedDevices),
+      never startDiscovery(). So we do NOT need BLUETOOTH_SCAN, BLUETOOTH_ADMIN,
+      or any location permission. Declaring "neverForLocation" keeps Play happy.
+        - Legacy BLUETOOTH covers API <= 30 (connecting to a bonded device).
+        - BLUETOOTH_CONNECT covers API 31+.
+    -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_CONNECT"
+        android:usesPermissionFlags="neverForLocation" />
+
+    <!-- Bluetooth is optional hardware: the dashboard works without a printer. -->
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
 
     <application
         android:allowBackup="true"
