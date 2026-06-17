@@ -52,6 +52,15 @@
             android:exported="false"
             android:label="@string/settings_title" />
 
+        <!-- QR scanner screen that follows the device orientation instead of
+             being forced to landscape (the bundled scanner's default). -->
+        <activity
+            android:name=".CaptureActivityAnyOrientation"
+            android:exported="false"
+            android:screenOrientation="fullSensor"
+            android:stateNotNeeded="true"
+            android:theme="@style/zxing_CaptureTheme" />
+
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"

@@ -146,7 +146,9 @@ public class SettingsActivity extends AppCompatActivity {
                 options.setDesiredBarcodeFormats(ScanOptions.QR_CODE);
                 options.setPrompt(getString(R.string.scan_qr_prompt));
                 options.setBeepEnabled(true);
-                options.setOrientationLocked(true); // steadier on older hardware
+                // Follow the device orientation instead of forcing landscape.
+                options.setCaptureActivity(CaptureActivityAnyOrientation.class);
+                options.setOrientationLocked(false);
                 qrScanLauncher.launch(options);
             } catch (Throwable t) {
                 // Any failure to even start the scanner → photo/manual instead.
