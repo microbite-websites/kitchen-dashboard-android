@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Flat fallback launcher icon for API 21-25 (pre-adaptive-icon).
+  Gradients are unreliable in launcher icons on these versions, so the
+  Microbite "bite" mark is drawn with solid fills on the dark-navy tile.
+  API 26+ devices use res/mipmap-anydpi-v26/ic_launcher.xml instead.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+
+    <!-- Dark navy background tile. -->
+    <path android:fillColor="#1A1A2E" android:pathData="M0,0h512v512h-512z" />
+
+    <group
+        android:name="mark"
+        android:pivotX="255"
+        android:pivotY="256"
+        android:scaleX="0.82"
+        android:scaleY="0.82">
+
+        <!-- Bite silhouette, solid Microbite orange. -->
+        <path
+            android:fillColor="#E76E33"
+            android:pathData="M43.8,256c0,136.6,110.8,247.4,247.4,247.4c67.2,0,128.2-26.8,172.8-70.4c3.5-3.4,7.3-12.9,0.1-20.6L279.6,286.1c-24.6-25.9,0-47.6,0-47.6L436.6,86.7c10.1-13.4,5.5-26.7-0.1-30.8C402.6,31.4,351.2,8.1,291.2,8.6C154.6,9.6,43.8,119.3,43.8,256z" />
+
+        <!-- White dot. -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M325.2,105.9c0,15.3,12.4,27.8,27.8,27.8s27.8,-12.5,27.8,-27.8S368.3,78.1,353,78.1S325.2,90.5,325.2,105.9z" />
+    </group>
+</vector>
