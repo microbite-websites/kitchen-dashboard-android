@@ -7,9 +7,12 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.ImageDecoder;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.provider.Settings;
 import android.widget.Toast;
 
@@ -24,9 +27,19 @@ import androidx.preference.PreferenceFragmentCompat;
 
 import com.journeyapps.barcodescanner.ScanContract;
 import com.journeyapps.barcodescanner.ScanOptions;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.BinaryBitmap;
+import com.google.zxing.DecodeHintType;
+import com.google.zxing.MultiFormatReader;
+import com.google.zxing.RGBLuminanceSource;
+import com.google.zxing.Result;
+import com.google.zxing.common.HybridBinarizer;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class SettingsActivity extends AppCompatActivity {
@@ -58,6 +71,7 @@ public class SettingsActivity extends AppCompatActivity {
         private ActivityResultLauncher<String> btPermissionLauncher;
         private ActivityResultLauncher<Intent> enableBtLauncher;
         private ActivityResultLauncher<ScanOptions> qrScanLauncher;
+        private ActivityResultLauncher<String> qrImagePickLauncher;
 
         @Override
         public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
@@ -86,6 +100,17 @@ public class SettingsActivity extends AppCompatActivity {
                     result -> {
                         if (result.getContents() != null) {
                             applyScannedUrl(result.getContents().trim());
+                        }
+                    });
+
+            // Pick a photo/screenshot of the QR and decode it. Works on every
+            // Android version (pure-Java decode, no camera Activity), so it's
+            // the fallback for devices where the live scanner can't run.
+            qrImagePickLauncher = registerForActivityResult(
+                    new ActivityResultContracts.GetContent(),
+                    uri -> {
+                        if (uri != null) {
+                            decodeQrFromImage(uri);
                         }
                     });
 
@@ -125,14 +150,23 @@ public class SettingsActivity extends AppCompatActivity {
         }
 
         /**
-         * When the camera scanner can't run, tell the user to paste the URL and
-         * open the Dashboard URL editor for them so they can do it right away.
+         * When the live camera scanner can't run, offer two paths: read the QR
+         * from a saved photo/screenshot (decoded in-app, works everywhere), or
+         * type the URL in by hand.
          */
         private void showManualUrlFallback() {
             new AlertDialog.Builder(requireContext())
                     .setTitle(R.string.scan_qr_unavailable_title)
                     .setMessage(R.string.scan_qr_unavailable_msg)
-                    .setPositiveButton(R.string.scan_qr_enter_manually, (d, w) -> {
+                    .setPositiveButton(R.string.scan_qr_photo_option, (d, w) -> {
+                        try {
+                            qrImagePickLauncher.launch("image/*");
+                        } catch (Exception e) {
+                            Toast.makeText(requireContext(),
+                                    R.string.scan_qr_photo_failed, Toast.LENGTH_LONG).show();
+                        }
+                    })
+                    .setNeutralButton(R.string.scan_qr_enter_manually, (d, w) -> {
                         Preference urlPref = findPreference("dashboard_url");
                         if (urlPref != null) {
                             onDisplayPreferenceDialog(urlPref); // opens the URL editor
@@ -140,6 +174,46 @@ public class SettingsActivity extends AppCompatActivity {
                     })
                     .setNegativeButton(R.string.printer_action_dismiss, null)
                     .show();
+        }
+
+        /**
+         * Decode a QR code from a picked image using zxing's pure-Java reader.
+         * Unlike the live scanner this uses no camera Activity, so it runs on
+         * every supported Android version. The bitmap is forced to a software
+         * (non-hardware) config so its pixels can be read back.
+         */
+        private void decodeQrFromImage(Uri uri) {
+            try {
+                Bitmap bmp;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    ImageDecoder.Source src = ImageDecoder.createSource(
+                            requireContext().getContentResolver(), uri);
+                    bmp = ImageDecoder.decodeBitmap(src, (decoder, info, source) ->
+                            decoder.setAllocator(ImageDecoder.ALLOCATOR_SOFTWARE));
+                } else {
+                    bmp = MediaStore.Images.Media.getBitmap(
+                            requireContext().getContentResolver(), uri);
+                }
+
+                int w = bmp.getWidth();
+                int h = bmp.getHeight();
+                int[] pixels = new int[w * h];
+                bmp.getPixels(pixels, 0, w, 0, 0, w, h);
+
+                BinaryBitmap binary = new BinaryBitmap(
+                        new HybridBinarizer(new RGBLuminanceSource(w, h, pixels)));
+                Map<DecodeHintType, Object> hints = new EnumMap<>(DecodeHintType.class);
+                hints.put(DecodeHintType.POSSIBLE_FORMATS,
+                        Collections.singletonList(BarcodeFormat.QR_CODE));
+                hints.put(DecodeHintType.TRY_HARDER, Boolean.TRUE);
+
+                Result result = new MultiFormatReader().decode(binary, hints);
+                applyScannedUrl(result.getText().trim());
+            } catch (Exception e) {
+                // No QR found in the image, or it couldn't be opened.
+                Toast.makeText(requireContext(),
+                        R.string.scan_qr_photo_failed, Toast.LENGTH_LONG).show();
+            }
         }
 
         /** Validates the scanned text is a dashboard URL and stores it. */

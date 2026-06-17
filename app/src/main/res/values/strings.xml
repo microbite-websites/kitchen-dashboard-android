@@ -11,8 +11,10 @@
     <string name="scan_qr_invalid">That QR code isn\'t a dashboard URL. It must start with http:// or https://</string>
     <string name="scan_qr_saved">Dashboard URL set from QR code</string>
     <string name="scan_qr_unavailable_title">Scanner not available</string>
-    <string name="scan_qr_unavailable_msg">This device can\'t open the QR scanner. Enter the dashboard URL manually instead — copy it from the WordPress settings page and paste it in here.</string>
-    <string name="scan_qr_enter_manually">Enter URL</string>
+    <string name="scan_qr_unavailable_msg">This device can\'t open the live QR scanner. You can still read the code: take a photo (or screenshot) of the dashboard QR, then choose Use a Photo to read it. Or type the URL in by hand.</string>
+    <string name="scan_qr_enter_manually">Type URL</string>
+    <string name="scan_qr_photo_option">Use a Photo</string>
+    <string name="scan_qr_photo_failed">Couldn\'t find a QR code in that image. Make sure the whole code is clear and in frame, then try again.</string>
     <string name="pref_keep_screen_on_title">Keep Screen On</string>
     <string name="pref_keep_screen_on_summary">Prevent screen from dimming while app is open (recommended when plugged in)</string>
     <string name="pref_auto_reconnect_title">Auto-Reconnect Printer</string>

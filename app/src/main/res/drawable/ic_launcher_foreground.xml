@@ -52,9 +52,21 @@
             </aapt:attr>
         </path>
 
-        <!-- White dot. -->
+    </group>
+
+    <!-- Food pellets in front of the open mouth (own group so the bite's
+         clip-path doesn't remove them). Same scale/pivot as the mark. -->
+    <group
+        android:name="food"
+        android:pivotX="255"
+        android:pivotY="256"
+        android:scaleX="0.62"
+        android:scaleY="0.62">
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M325.2,105.9c0,15.3,12.4,27.8,27.8,27.8s27.8,-12.5,27.8,-27.8S368.3,78.1,353,78.1S325.2,90.5,325.2,105.9z" />
+            android:pathData="M407,238a18,18 0 1,0 36,0a18,18 0 1,0 -36,0z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M469,224a11,11 0 1,0 22,0a11,11 0 1,0 -22,0z" />
     </group>
 </vector>

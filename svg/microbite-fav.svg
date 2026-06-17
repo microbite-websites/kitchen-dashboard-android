@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generator: Adobe Illustrator 28.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<!-- Microbite "bite" mark. The white highlight dot was removed (it read as an
+     eye); two food pellets sit in front of the open mouth so the mark reads as
+     a bite/Pac-Man eating. -->
 <svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
 	 viewBox="0 0 512 512" style="enable-background:new 0 0 512 512;" xml:space="preserve">
 <style type="text/css">
@@ -19,7 +21,7 @@
 	</clipPath>
 	<g style="clip-path:url(#SVGID_00000052821861379599404630000012669568178632214953_);">
 		<g>
-			
+
 				<radialGradient id="SVGID_00000123435593452996141070000008271008749867010960_" cx="-489.0751" cy="-13.9885" r="503.75" gradientTransform="matrix(-1 0 0 -1 -199.84 496)" gradientUnits="userSpaceOnUse">
 				<stop  offset="0.1" style="stop-color:#FCBA63"/>
 				<stop  offset="0.51" style="stop-color:#E76E33"/>
@@ -27,9 +29,7 @@
 			</radialGradient>
 			<path style="fill:url(#SVGID_00000123435593452996141070000008271008749867010960_);" d="M43.8,256
 				c0,136.6,110.8,247.4,247.4,247.4S538.7,392.7,538.7,256S427.9,8.6,291.2,8.6S43.8,119.3,43.8,256z"/>
-			<path class="st2" d="M325.2,105.9c0,15.3,12.4,27.8,27.8,27.8s27.8-12.5,27.8-27.8S368.3,78.1,353,78.1S325.2,90.5,325.2,105.9z"
-				/>
-			
+
 				<linearGradient id="SVGID_00000060744854741364205380000010545508735146139279_" gradientUnits="userSpaceOnUse" x1="-491.2452" y1="227.276" x2="-491.2452" y2="473.2815" gradientTransform="matrix(-1 0 0 -1 -199.84 496)">
 				<stop  offset="0.12" style="stop-color:#E76E33"/>
 				<stop  offset="1" style="stop-color:#FFFFFF"/>
@@ -38,5 +38,8 @@
 				s210.2,41.8,210.2-57.5S407.6,22.7,291.5,22.7S81.1,103.2,81.1,202.5z"/>
 		</g>
 	</g>
+	<!-- Food pellets in front of the open mouth (not clipped by the bite). -->
+	<circle class="st2" cx="425" cy="238" r="18"/>
+	<circle class="st2" cx="480" cy="224" r="11"/>
 </g>
 </svg>
