@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # lets the keystore step commit the fixed key on first run
     steps:
       - uses: actions/checkout@v4
 
@@ -21,6 +23,29 @@ jobs:
       - uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: '8.4'
+
+      # Ensure a FIXED debug signing key exists so every build signs the same
+      # way and new APKs install over old ones. Generated + committed once;
+      # all later runs just reuse the committed file.
+      - name: Ensure stable debug keystore
+        run: |
+          if [ ! -f app/keystore/debug.keystore ]; then
+            echo "No fixed keystore yet — creating and committing one."
+            mkdir -p app/keystore
+            keytool -genkeypair -v \
+              -keystore app/keystore/debug.keystore \
+              -storepass android -keypass android \
+              -alias androiddebugkey -keyalg RSA -keysize 2048 \
+              -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -f app/keystore/debug.keystore
+            git commit -m "ci: add fixed debug keystore for stable update signing [skip ci]"
+            git push origin HEAD:main \
+              || echo "WARNING: could not push the keystore (branch protection?). It is used for THIS build, but won't persist."
+          else
+            echo "Fixed keystore already present — reusing it."
+          fi
 
       - run: chmod +x gradlew
 

@@ -102,12 +102,44 @@ public class SettingsActivity extends AppCompatActivity {
 
         /** Opens the bundled ZXing scanner. It requests the CAMERA permission itself. */
         private void launchQrScanner() {
-            ScanOptions options = new ScanOptions();
-            options.setDesiredBarcodeFormats(ScanOptions.QR_CODE);
-            options.setPrompt(getString(R.string.scan_qr_prompt));
-            options.setBeepEnabled(true);
-            options.setOrientationLocked(false);
-            qrScanLauncher.launch(options);
+            // The bundled scanner (zxing-android-embedded 4.3) needs Android 7+
+            // (API 24). On older devices launching it crashes the app, so fall
+            // back to manual entry there. Same if the device has no camera.
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N
+                    || !requireContext().getPackageManager()
+                            .hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)) {
+                showManualUrlFallback();
+                return;
+            }
+            try {
+                ScanOptions options = new ScanOptions();
+                options.setDesiredBarcodeFormats(ScanOptions.QR_CODE);
+                options.setPrompt(getString(R.string.scan_qr_prompt));
+                options.setBeepEnabled(true);
+                options.setOrientationLocked(true); // steadier on older hardware
+                qrScanLauncher.launch(options);
+            } catch (Exception e) {
+                // Any failure to even start the scanner → manual entry instead.
+                showManualUrlFallback();
+            }
+        }
+
+        /**
+         * When the camera scanner can't run, tell the user to paste the URL and
+         * open the Dashboard URL editor for them so they can do it right away.
+         */
+        private void showManualUrlFallback() {
+            new AlertDialog.Builder(requireContext())
+                    .setTitle(R.string.scan_qr_unavailable_title)
+                    .setMessage(R.string.scan_qr_unavailable_msg)
+                    .setPositiveButton(R.string.scan_qr_enter_manually, (d, w) -> {
+                        Preference urlPref = findPreference("dashboard_url");
+                        if (urlPref != null) {
+                            onDisplayPreferenceDialog(urlPref); // opens the URL editor
+                        }
+                    })
+                    .setNegativeButton(R.string.printer_action_dismiss, null)
+                    .show();
         }
 
         /** Validates the scanned text is a dashboard URL and stores it. */
