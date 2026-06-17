@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Microbite "bite" mark. The white highlight dot was removed (it read as an
-     eye); two food pellets sit in front of the open mouth so the mark reads as
-     a bite/Pac-Man eating. -->
+     eye), leaving the clean bite silhouette. -->
 <svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
 	 viewBox="0 0 512 512" style="enable-background:new 0 0 512 512;" xml:space="preserve">
 <style type="text/css">
@@ -38,8 +37,5 @@
 				s210.2,41.8,210.2-57.5S407.6,22.7,291.5,22.7S81.1,103.2,81.1,202.5z"/>
 		</g>
 	</g>
-	<!-- Food pellets in front of the open mouth (not clipped by the bite). -->
-	<circle class="st2" cx="425" cy="238" r="18"/>
-	<circle class="st2" cx="480" cy="224" r="11"/>
 </g>
 </svg>

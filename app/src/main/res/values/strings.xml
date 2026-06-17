@@ -15,6 +15,10 @@
     <string name="scan_qr_enter_manually">Type URL</string>
     <string name="scan_qr_photo_option">Use a Photo</string>
     <string name="scan_qr_photo_failed">Couldn\'t find a QR code in that image. Make sure the whole code is clear and in frame, then try again.</string>
+    <string name="scan_qr_found_title">QR code found</string>
+    <string name="scan_qr_use_it">Use It</string>
+    <string name="scan_qr_copy">Copy</string>
+    <string name="scan_qr_copied">URL copied to clipboard</string>
     <string name="pref_keep_screen_on_title">Keep Screen On</string>
     <string name="pref_keep_screen_on_summary">Prevent screen from dimming while app is open (recommended when plugged in)</string>
     <string name="pref_auto_reconnect_title">Auto-Reconnect Printer</string>

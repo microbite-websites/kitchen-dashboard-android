@@ -5,14 +5,16 @@ import android.annotation.SuppressLint;
 import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
-import android.graphics.ImageDecoder;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.provider.MediaStore;
 import android.provider.Settings;
 import android.widget.Toast;
 
@@ -35,6 +37,7 @@ import com.google.zxing.RGBLuminanceSource;
 import com.google.zxing.Result;
 import com.google.zxing.common.HybridBinarizer;
 
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -177,28 +180,26 @@ public class SettingsActivity extends AppCompatActivity {
         }
 
         /**
-         * Decode a QR code from a picked image using zxing's pure-Java reader.
-         * Unlike the live scanner this uses no camera Activity, so it runs on
-         * every supported Android version. The bitmap is forced to a software
-         * (non-hardware) config so its pixels can be read back.
+         * Decode a QR code from a picked image using zxing's pure-Java reader
+         * (bundled in the APK, so this works on every Android version with no
+         * camera Activity). The image is downsampled to ~1200px on load so a
+         * multi-megapixel photo can't exhaust memory on a low-RAM device, and
+         * we catch Throwable so an out-of-memory can never hard-crash the app.
          */
         private void decodeQrFromImage(Uri uri) {
             try {
-                Bitmap bmp;
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    ImageDecoder.Source src = ImageDecoder.createSource(
-                            requireContext().getContentResolver(), uri);
-                    bmp = ImageDecoder.decodeBitmap(src, (decoder, info, source) ->
-                            decoder.setAllocator(ImageDecoder.ALLOCATOR_SOFTWARE));
-                } else {
-                    bmp = MediaStore.Images.Media.getBitmap(
-                            requireContext().getContentResolver(), uri);
+                Bitmap bmp = loadDownsampledBitmap(uri, 1200);
+                if (bmp == null) {
+                    Toast.makeText(requireContext(),
+                            R.string.scan_qr_photo_failed, Toast.LENGTH_LONG).show();
+                    return;
                 }
 
                 int w = bmp.getWidth();
                 int h = bmp.getHeight();
                 int[] pixels = new int[w * h];
                 bmp.getPixels(pixels, 0, w, 0, 0, w, h);
+                bmp.recycle();
 
                 BinaryBitmap binary = new BinaryBitmap(
                         new HybridBinarizer(new RGBLuminanceSource(w, h, pixels)));
@@ -208,12 +209,68 @@ public class SettingsActivity extends AppCompatActivity {
                 hints.put(DecodeHintType.TRY_HARDER, Boolean.TRUE);
 
                 Result result = new MultiFormatReader().decode(binary, hints);
-                applyScannedUrl(result.getText().trim());
-            } catch (Exception e) {
-                // No QR found in the image, or it couldn't be opened.
+                showScannedUrlOptions(result.getText().trim());
+            } catch (Throwable t) {
+                // No QR found, image unreadable, or out of memory — never crash.
                 Toast.makeText(requireContext(),
                         R.string.scan_qr_photo_failed, Toast.LENGTH_LONG).show();
             }
+        }
+
+        /**
+         * Load a picked image scaled down so its longest edge is no larger than
+         * {@code maxEdge}, using BitmapFactory's inSampleSize (powers of two).
+         * Reading the bounds first means the full-size bitmap is never created.
+         */
+        private Bitmap loadDownsampledBitmap(Uri uri, int maxEdge) throws Exception {
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            try (InputStream in = requireContext().getContentResolver().openInputStream(uri)) {
+                BitmapFactory.decodeStream(in, null, bounds);
+            }
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+                return null;
+            }
+
+            int sample = 1;
+            int longest = Math.max(bounds.outWidth, bounds.outHeight);
+            while (longest / sample > maxEdge) {
+                sample *= 2;
+            }
+
+            BitmapFactory.Options opts = new BitmapFactory.Options();
+            opts.inSampleSize = sample;
+            opts.inPreferredConfig = Bitmap.Config.ARGB_8888;
+            try (InputStream in = requireContext().getContentResolver().openInputStream(uri)) {
+                return BitmapFactory.decodeStream(in, null, opts);
+            }
+        }
+
+        /**
+         * Show the decoded URL with the choice to fill it in directly or copy it
+         * to the clipboard for manual pasting (the reliable escape hatch on
+         * locked-down devices).
+         */
+        private void showScannedUrlOptions(String scanned) {
+            if (!scanned.startsWith("http://") && !scanned.startsWith("https://")) {
+                Toast.makeText(requireContext(), R.string.scan_qr_invalid, Toast.LENGTH_LONG).show();
+                return;
+            }
+            new AlertDialog.Builder(requireContext())
+                    .setTitle(R.string.scan_qr_found_title)
+                    .setMessage(scanned)
+                    .setPositiveButton(R.string.scan_qr_use_it, (d, w) -> applyScannedUrl(scanned))
+                    .setNeutralButton(R.string.scan_qr_copy, (d, w) -> {
+                        ClipboardManager cm = (ClipboardManager)
+                                requireContext().getSystemService(Context.CLIPBOARD_SERVICE);
+                        if (cm != null) {
+                            cm.setPrimaryClip(ClipData.newPlainText("Dashboard URL", scanned));
+                            Toast.makeText(requireContext(),
+                                    R.string.scan_qr_copied, Toast.LENGTH_SHORT).show();
+                        }
+                    })
+                    .setNegativeButton(R.string.printer_action_dismiss, null)
+                    .show();
         }
 
         /** Validates the scanned text is a dashboard URL and stores it. */
