@@ -33,8 +33,10 @@ import com.google.zxing.BarcodeFormat;
 import com.google.zxing.BinaryBitmap;
 import com.google.zxing.DecodeHintType;
 import com.google.zxing.MultiFormatReader;
+import com.google.zxing.NotFoundException;
 import com.google.zxing.RGBLuminanceSource;
 import com.google.zxing.Result;
+import com.google.zxing.common.GlobalHistogramBinarizer;
 import com.google.zxing.common.HybridBinarizer;
 
 import java.io.InputStream;
@@ -130,12 +132,12 @@ public class SettingsActivity extends AppCompatActivity {
 
         /** Opens the bundled ZXing scanner. It requests the CAMERA permission itself. */
         private void launchQrScanner() {
-            // The bundled scanner (zxing-android-embedded 4.3) needs Android 7+
-            // (API 24). On older devices launching it crashes the app, so fall
-            // back to manual entry there. Same if the device has no camera.
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N
-                    || !requireContext().getPackageManager()
-                            .hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)) {
+            // With Java 8 desugaring enabled (see app/build.gradle) the bundled
+            // scanner now runs on Android 6/7 too, so we launch it on any device
+            // that has a camera. The photo/manual fallback covers cameraless
+            // devices or the rare case the scanner still can't start.
+            if (!requireContext().getPackageManager()
+                    .hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)) {
                 showManualUrlFallback();
                 return;
             }
@@ -146,8 +148,8 @@ public class SettingsActivity extends AppCompatActivity {
                 options.setBeepEnabled(true);
                 options.setOrientationLocked(true); // steadier on older hardware
                 qrScanLauncher.launch(options);
-            } catch (Exception e) {
-                // Any failure to even start the scanner → manual entry instead.
+            } catch (Throwable t) {
+                // Any failure to even start the scanner → photo/manual instead.
                 showManualUrlFallback();
             }
         }
@@ -188,7 +190,9 @@ public class SettingsActivity extends AppCompatActivity {
          */
         private void decodeQrFromImage(Uri uri) {
             try {
-                Bitmap bmp = loadDownsampledBitmap(uri, 1200);
+                // ~1600px keeps enough detail to read a dense QR while staying
+                // small enough (~11MB) not to exhaust a low-RAM device's heap.
+                Bitmap bmp = loadDownsampledBitmap(uri, 1600);
                 if (bmp == null) {
                     Toast.makeText(requireContext(),
                             R.string.scan_qr_photo_failed, Toast.LENGTH_LONG).show();
@@ -201,19 +205,44 @@ public class SettingsActivity extends AppCompatActivity {
                 bmp.getPixels(pixels, 0, w, 0, 0, w, h);
                 bmp.recycle();
 
-                BinaryBitmap binary = new BinaryBitmap(
-                        new HybridBinarizer(new RGBLuminanceSource(w, h, pixels)));
-                Map<DecodeHintType, Object> hints = new EnumMap<>(DecodeHintType.class);
-                hints.put(DecodeHintType.POSSIBLE_FORMATS,
-                        Collections.singletonList(BarcodeFormat.QR_CODE));
-                hints.put(DecodeHintType.TRY_HARDER, Boolean.TRUE);
-
-                Result result = new MultiFormatReader().decode(binary, hints);
-                showScannedUrlOptions(result.getText().trim());
+                Result result = decodeQr(pixels, w, h);
+                if (result != null) {
+                    showScannedUrlOptions(result.getText().trim());
+                } else {
+                    Toast.makeText(requireContext(),
+                            R.string.scan_qr_photo_failed, Toast.LENGTH_LONG).show();
+                }
             } catch (Throwable t) {
-                // No QR found, image unreadable, or out of memory — never crash.
+                // Image unreadable or out of memory — never crash.
                 Toast.makeText(requireContext(),
                         R.string.scan_qr_photo_failed, Toast.LENGTH_LONG).show();
+            }
+        }
+
+        /**
+         * Try to read a QR from raw pixels, attempting two binarizers: the
+         * Hybrid one (best for photos with uneven lighting) and, failing that,
+         * the Global Histogram one (better for clean, evenly-lit images).
+         * Returns null if neither finds a code.
+         */
+        private Result decodeQr(int[] pixels, int w, int h) {
+            RGBLuminanceSource source = new RGBLuminanceSource(w, h, pixels);
+            Map<DecodeHintType, Object> hints = new EnumMap<>(DecodeHintType.class);
+            hints.put(DecodeHintType.POSSIBLE_FORMATS,
+                    Collections.singletonList(BarcodeFormat.QR_CODE));
+            hints.put(DecodeHintType.TRY_HARDER, Boolean.TRUE);
+
+            MultiFormatReader reader = new MultiFormatReader();
+            try {
+                return reader.decode(new BinaryBitmap(new HybridBinarizer(source)), hints);
+            } catch (NotFoundException ignored) {
+                // fall through to the second binarizer
+            }
+            try {
+                reader.reset();
+                return reader.decode(new BinaryBitmap(new GlobalHistogramBinarizer(source)), hints);
+            } catch (NotFoundException ignored) {
+                return null;
             }
         }
 

@@ -10,8 +10,8 @@ android {
         applicationId "com.microbite.kitchendashboard"
         minSdk 21
         targetSdk 34
-        versionCode 12
-        versionName "1.2.0"
+        versionCode 13
+        versionName "1.2.1"
     }
 
     // Give built APKs a memorable, versioned filename instead of app-debug.apk
@@ -55,6 +55,10 @@ android {
     }
 
     compileOptions {
+        // Desugaring back-ports the Java 8 APIs that zxing:core 3.4.x uses, so
+        // the live QR scanner runs on Android 6/7 instead of crashing. Without
+        // this, zxing-android-embedded 4.3 only works on API 24+.
+        coreLibraryDesugaringEnabled true
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
@@ -65,6 +69,7 @@ android {
 }
 
 dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.11.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
